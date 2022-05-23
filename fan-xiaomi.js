@@ -59,7 +59,7 @@ class FanXiaomi extends HTMLElement {
 
     supportedAttributes = {
         angle: true, childLock: true, timer: true, rotationAngle: true, speedLevels: 4,
-        naturalSpeed: true, supportedAngles: [30, 60, 90, 120], sleepMode: false, led: false
+        naturalSpeed: true, supportedAngles: [30, 60, 90, 120], sleepMode: false, led: false, buzzer: false
     }
 
     entityFilters = {
@@ -86,6 +86,10 @@ class FanXiaomi extends HTMLElement {
         ledSwitch: {
             prefix: 'switch.',
             suffix: '_led'
+        },
+        buzzerSwitch: {
+            prefix: 'switch.',
+            suffix: '_buzzer'
         },
         temperature: {
             prefix: 'sensor.',
@@ -269,6 +273,26 @@ class FanXiaomi extends HTMLElement {
         return hass.states[this.config.entity].attributes['led_brightness'] < 2;
     }
 
+    setBuzzer(hass, on) {
+        if (this.switchBuzzerEntity) {
+            if (on) {
+                hass.callService('switch', 'turn_on', {
+                    entity_id: this.switchBuzzerEntity,
+                });
+            } else {
+                hass.callService('switch', 'turn_off', {
+                    entity_id: this.switchBuzzerEntity,
+                });
+            }
+        }
+    }
+
+    getBuzzer(hass) {
+        if (this.switchBuzzerEntity) {
+            return hass.states[this.switchBuzzerEntity].state === 'on';
+        }
+    }
+
     getTemperature(hass) {
         if (this.temperatureEntity) {
             return hass.states[this.temperatureEntity].state;
@@ -315,18 +339,18 @@ class FanXiaomi extends HTMLElement {
 
     checkFanAuxFeatures(hass, deviceEntities) {
         const oscillationEntity = this.getAuxEntity(deviceEntities, this.entityFilters['angle']);
-            if (oscillationEntity) {
-                this.oscillationAngleEntity = oscillationEntity.entity_id;
-                this.supportedAttributes.angle = true;
-                const attr = hass.states[this.oscillationAngleEntity].attributes;
-                if (attr.min && attr.max && attr.step) {
-                    const angles = [];
-                    for (let a = attr.min; a <= attr.max; a += attr.step) {
-                        angles.push(a);
-                    }
-                    this.supportedAttributes.supportedAngles = angles;
+        if (oscillationEntity) {
+            this.oscillationAngleEntity = oscillationEntity.entity_id;
+            this.supportedAttributes.angle = true;
+            const attr = hass.states[this.oscillationAngleEntity].attributes;
+            if (attr.min && attr.max && attr.step) {
+                const angles = [];
+                for (let a = attr.min; a <= attr.max; a += attr.step) {
+                    angles.push(a);
                 }
+                this.supportedAttributes.supportedAngles = angles;
             }
+        }
 
         const delayEntity = this.getAuxEntity(deviceEntities, this.entityFilters['timer']);
         if (delayEntity) {
@@ -356,6 +380,12 @@ class FanXiaomi extends HTMLElement {
         if (switchLedEntity) {
             this.switchLedEntity = switchLedEntity.entity_id;
             this.supportedAttributes.led = true;
+        }
+
+        const switchBuzzerEntity = this.getAuxEntity(deviceEntities, this.entityFilters['buzzerSwitch']);
+        if (switchBuzzerEntity) {
+            this.switchBuzzerEntity = switchBuzzerEntity.entity_id;
+            this.supportedAttributes.buzzer = true;
         }
     }
 
@@ -396,13 +426,13 @@ class FanXiaomi extends HTMLElement {
             const state = hass.states[this.config.entity];
             const attrs = state.attributes;
 
-            if (['dmaker.fan.p15'].includes(attrs['model'])){
+            if (['dmaker.fan.p15'].includes(attrs['model'])) {
                 this.supportedAttributes.supportedAngles = [30, 60, 90, 120, 140];
                 //this.supportedAttributes.led = true;
             }
 
             //temp solution for FA1 fan until proper fan support is added in the upstream
-            if (['zhimi.fan.fa1'].includes(attrs['model'])){
+            if (['zhimi.fan.fa1'].includes(attrs['model'])) {
                 this.supportedAttributes.speedIncreaseDecreaseButtons = true;
                 this.supportedAttributes.angle = false;
                 this.supportedAttributes.childLock = false;
@@ -411,7 +441,7 @@ class FanXiaomi extends HTMLElement {
                 this.supportedAttributes.naturalSpeed = false;
                 this.supportedAttributes.timer = false;
             }
-            if (['leshow.fan.ss4'].includes(attrs['model'])){
+            if (['leshow.fan.ss4'].includes(attrs['model'])) {
                 this.supportedAttributes.angle = false;
                 this.supportedAttributes.childLock = false;
                 this.supportedAttributes.rotationAngle = false;
@@ -444,10 +474,10 @@ class FanXiaomi extends HTMLElement {
 
         // Angle adjustment event bindings
         ui.querySelector('.left').onmouseover = () => {
-            ui.querySelector('.left').classList.replace('hidden','show')
+            ui.querySelector('.left').classList.replace('hidden', 'show')
         }
         ui.querySelector('.left').onmouseout = () => {
-            ui.querySelector('.left').classList.replace('show','hidden')
+            ui.querySelector('.left').classList.replace('show', 'hidden')
         }
         ui.querySelector('.left').onclick = () => {
             if (ui.querySelector('.fanbox').classList.contains('active')) {
@@ -459,10 +489,10 @@ class FanXiaomi extends HTMLElement {
             }
         }
         ui.querySelector('.right').onmouseover = () => {
-            ui.querySelector('.right').classList.replace('hidden','show')
+            ui.querySelector('.right').classList.replace('hidden', 'show')
         }
         ui.querySelector('.right').onmouseout = () => {
-            ui.querySelector('.right').classList.replace('show','hidden')
+            ui.querySelector('.right').classList.replace('show', 'hidden')
         }
         ui.querySelector('.right').onclick = () => {
             if (ui.querySelector('.fanbox').classList.contains('active')) {
@@ -495,7 +525,7 @@ class FanXiaomi extends HTMLElement {
                 let maskSpeedLevel = /mdi:numeric-(\d)-box-outline/g
                 let speedLevelMatch = maskSpeedLevel.exec(icon)
                 let speedLevel = parseInt(speedLevelMatch ? speedLevelMatch[1] : 1)
-                newSpeedLevel = speedLevel + 1 
+                newSpeedLevel = speedLevel + 1
                 if (newSpeedLevel > this.supportedAttributes.speedLevels) {
                     newSpeedLevel = 1
                 }
@@ -528,9 +558,9 @@ class FanXiaomi extends HTMLElement {
                     let u = ui.querySelector('.var-angle');
                     let oldAngleText = u.innerHTML;
                     let newAngle;
-                    let curAngleIndex = this.supportedAttributes.supportedAngles.indexOf(parseInt(oldAngleText,10));
-                    if (curAngleIndex >= 0 && curAngleIndex < this.supportedAttributes.supportedAngles.length-1) {
-                        newAngle = this.supportedAttributes.supportedAngles[curAngleIndex+1];
+                    let curAngleIndex = this.supportedAttributes.supportedAngles.indexOf(parseInt(oldAngleText, 10));
+                    if (curAngleIndex >= 0 && curAngleIndex < this.supportedAttributes.supportedAngles.length - 1) {
+                        newAngle = this.supportedAttributes.supportedAngles[curAngleIndex + 1];
                     } else {
                         newAngle = this.supportedAttributes.supportedAngles[0];
                     }
@@ -654,6 +684,17 @@ class FanXiaomi extends HTMLElement {
             }
         }
 
+        // Buzzer mode event bindings
+        ui.querySelector('.var-buzzer').onclick = () => {
+            this.log('Buzzer')
+            if (ui.querySelector('.fanbox').classList.contains('active')) {
+                let u = ui.querySelector('.var-buzzer')
+                const setBuzzerOn = !u.classList.contains('active');
+                this.log(`Set buzzer mode to: ${setBuzzerOn ? 'On' : 'Off'}`);
+                this.setBuzzer(hass, setBuzzerOn);
+            }
+        }
+
         // Oscillation toggle event bindings
         ui.querySelector('.var-oscillating').onclick = () => {
             this.log('Oscillate')
@@ -714,7 +755,8 @@ class FanXiaomi extends HTMLElement {
             led: this.getLed(hass),
             temperature: this.getTemperature(hass),
             humidity: this.getHumidity(hass),
-            power_supply: this.getPowerSupply(hass)
+            power_supply: this.getPowerSupply(hass),
+            buzzer: this.getBuzzer(hass)
         });
     }
 
@@ -739,19 +781,19 @@ class FanXiaomi extends HTMLElement {
 
     /*********************************** UI settings ************************************/
     getUI() {
-        let csss='';
-        for(var i=1;i<73;i++){
-            csss+='.ang'+i+` {
-                transform: rotate(`+(i-1)*5+`deg);
+        let csss = '';
+        for (var i = 1; i < 73; i++) {
+            csss += '.ang' + i + ` {
+                transform: rotate(`+ (i - 1) * 5 + `deg);
             }`
         }
-        let fans='';
-        for(var i=1;i<73;i++){
-            fans+=`<div class="fan ang`+i+`"></div>`
+        let fans = '';
+        for (var i = 1; i < 73; i++) {
+            fans += `<div class="fan ang` + i + `"></div>`
         }
-        let fan1s='';
-        for(var i=1;i<73;i+=2){
-            fan1s+=`<div class="fan1 ang`+i+`"></div>`
+        let fan1s = '';
+        for (var i = 1; i < 73; i += 2) {
+            fan1s += `<div class="fan1 ang` + i + `"></div>`
         }
         let fanbox = document.createElement('div')
         fanbox.className = 'fan-xiaomi-panel'
@@ -775,7 +817,7 @@ p{margin:0;padding:0}
 .op-row .op button{outline:0;border:none;background:0 0;cursor:pointer}
 .op-row .op .icon-waper{display:block;margin:0 auto 5px;width:30px;height:30px}
 .op-row .op.active button{color:#01be9e!important;text-shadow:0 0 10px #01be9e}
-`+csss+`
+`+ csss + `
 .fanbox-container{position:relative;}
 .var-sensors{position:absolute;left:10px;text-align:left;color:var(--secondary-text-color);}
 .var-power-supply{position:absolute;right:10px;color:var(--secondary-text-color);}
@@ -830,7 +872,7 @@ to{transform:perspective(10em) rotateY(40deg)}
 <div class="b2 ang25"></div>
 <div class="b3 ang49"></div>
 </div>
-`+fans+fan1s+`
+`+ fans + fan1s + `
 <div class="c2"></div>
 <div class="c3">
 <span class="icon-waper">
@@ -923,6 +965,14 @@ Sleep
 LED
 </button>
 </div>
+<div class="op var-buzzer">
+<button>
+<span class="icon-waper">
+<ha-icon icon="mdi:volume-high"></ha-icon>
+</span>
+Buzzer
+</button>
+</div>
 </div>
 `
         return fanbox
@@ -930,15 +980,15 @@ LED
 
     // Define UI Parameters
 
-    setUI(fanboxa, {title, speed_percentage, state, child_lock, oscillating,
+    setUI(fanboxa, { title, speed_percentage, state, child_lock, oscillating,
         delay_off_countdown, angle, speed_level, preset_mode, model, led,
-        temperature, humidity, power_supply
+        temperature, humidity, power_supply, buzzer
     }) {
         fanboxa.querySelector('.var-title').textContent = title
 
         var needSeparatorFlag = false
         // Child Lock
-        if (this.supportedAttributes.childLock){
+        if (this.supportedAttributes.childLock) {
             needSeparatorFlag = true
             if (child_lock) {
                 fanboxa.querySelector('.var-childlock').textContent = 'On'
@@ -951,7 +1001,7 @@ LED
         }
 
         // Angle
-        if (this.supportedAttributes.angle){
+        if (this.supportedAttributes.angle) {
             if (needSeparatorFlag)
                 fanboxa.querySelector('.button-angle').style.borderLeft = '1px solid #01be9e'
             needSeparatorFlag = true
@@ -968,7 +1018,7 @@ LED
             needSeparatorFlag = true
 
             let timer_display = 'Off'
-            if(delay_off_countdown) {
+            if (delay_off_countdown) {
                 let total_mins = delay_off_countdown
 
                 if (model === 'dmaker.fan.p15') {
@@ -977,8 +1027,8 @@ LED
 
                 let hours = Math.floor(total_mins / 60)
                 let mins = Math.floor(total_mins % 60)
-                if(hours) {
-                    if(mins) {
+                if (hours) {
+                    if (mins) {
                         timer_display = `${hours}h ${mins}m`
                     } else {
                         timer_display = `${hours}h`
@@ -1016,7 +1066,21 @@ LED
                 activeElement.classList.remove('active')
             }
         } else {
-            activeElement.style.display='none'
+            activeElement.style.display = 'none'
+        }
+
+        // Buzzer
+        activeElement = fanboxa.querySelector('.var-buzzer')
+        if (this.supportedAttributes.buzzer) {
+            if (buzzer) {
+                if (activeElement.classList.contains('active') === false) {
+                    activeElement.classList.add('active')
+                }
+            } else {
+                activeElement.classList.remove('active')
+            }
+        } else {
+            activeElement.style.display = 'none'
         }
 
         // Power
@@ -1056,7 +1120,7 @@ LED
                 activeElement.classList.remove('active')
             }
         } else {
-            activeElement.style.display='none'
+            activeElement.style.display = 'none'
         }
 
         // Sleep mode
@@ -1070,7 +1134,7 @@ LED
                 activeElement.classList.remove('active')
             }
         } else {
-            activeElement.style.display='none'
+            activeElement.style.display = 'none'
         }
 
         // Oscillation
@@ -1096,14 +1160,14 @@ LED
 
         if (!this.supportedAttributes.speedIncreaseDecreaseButtons) {
             activeElement = fanboxa.querySelector('.var-speedup')
-            activeElement.style.display='none'
+            activeElement.style.display = 'none'
             activeElement = fanboxa.querySelector('.var-speeddown')
-            activeElement.style.display='none'
+            activeElement.style.display = 'none'
         } else {
             activeElement = fanboxa.querySelector('.var-speed')
-            activeElement.style.display='none'
+            activeElement.style.display = 'none'
             activeElement = fanboxa.querySelector('.var-oscillating')
-            activeElement.style.display='none'
+            activeElement.style.display = 'none'
         }
 
         // Fan Animation
@@ -1129,7 +1193,7 @@ LED
             }
         }
     }
-/*********************************** UI Settings ************************************/
+    /*********************************** UI Settings ************************************/
 
     // Add to logs
     log() {
@@ -1147,22 +1211,22 @@ customElements.define('fan-xiaomi', FanXiaomi);
 
 class ContentCardEditor extends LitElement {
 
-  setConfig(config) {
-    this.config = {
-        // Merge over default config so we can guarantee we always have a complete config
-        ...defaultConfig,
-        ...config,
-    };
-  }
+    setConfig(config) {
+        this.config = {
+            // Merge over default config so we can guarantee we always have a complete config
+            ...defaultConfig,
+            ...config,
+        };
+    }
 
-  static get properties() {
-      return {
-          hass: {},
-          config: {}
-      };
-  }
-  render() {
-    return html`
+    static get properties() {
+        return {
+            hass: {},
+            config: {}
+        };
+    }
+    render() {
+        return html`
     <style>
         .row{padding-bottom:5px;}
     </style>
@@ -1193,9 +1257,9 @@ class ContentCardEditor extends LitElement {
       <div class="row">
       <ha-entity-picker
         .label="${this.hass.localize(
-          "ui.panel.lovelace.editor.card.generic.entity"
+            "ui.panel.lovelace.editor.card.generic.entity"
         )} (${this.hass.localize(
-          "ui.panel.lovelace.editor.card.config.required"
+            "ui.panel.lovelace.editor.card.config.required"
         )})"
         .hass=${this.hass}
         .value=${this.config.entity}
@@ -1234,44 +1298,44 @@ class ContentCardEditor extends LitElement {
       </div>
     </div>
     `
-  }
-  _focusEntity(e){
-    e.target.value = ''
-  }
-
-  _valueChanged(e) {
-    if (!this.config || !this.hass) {
-      return;
     }
-    const { target } = e;
-    if (target.configValue) {
-      if (target.value === '') {
-        delete this.config[target.configValue];
-      } else {
-        this.config = {
-          ...this.config,
-          [target.configValue]: target.checked !== undefined ? target.checked : target.value,
-        };
-      }
+    _focusEntity(e) {
+        e.target.value = ''
     }
-    this.configChanged(this.config)
-  }
 
-  configChanged(newConfig) {
-    const event = new Event("config-changed", {
-      bubbles: true,
-      composed: true
-    });
-    event.detail = {config: newConfig};
-    this.dispatchEvent(event);
-  }
+    _valueChanged(e) {
+        if (!this.config || !this.hass) {
+            return;
+        }
+        const { target } = e;
+        if (target.configValue) {
+            if (target.value === '') {
+                delete this.config[target.configValue];
+            } else {
+                this.config = {
+                    ...this.config,
+                    [target.configValue]: target.checked !== undefined ? target.checked : target.value,
+                };
+            }
+        }
+        this.configChanged(this.config)
+    }
+
+    configChanged(newConfig) {
+        const event = new Event("config-changed", {
+            bubbles: true,
+            composed: true
+        });
+        event.detail = { config: newConfig };
+        this.dispatchEvent(event);
+    }
 }
 
 customElements.define("content-card-editor", ContentCardEditor);
 window.customCards = window.customCards || [];
 window.customCards.push({
-  type: "fan-xiaomi",
-  name: "Xiaomi Fan Lovelace Card",
-  preview: true,
-  description: "Xiaomi Smartmi Fan Lovelace card for HASS/Home Assistant."
+    type: "fan-xiaomi",
+    name: "Xiaomi Fan Lovelace Card",
+    preview: true,
+    description: "Xiaomi Smartmi Fan Lovelace card for HASS/Home Assistant."
 });
