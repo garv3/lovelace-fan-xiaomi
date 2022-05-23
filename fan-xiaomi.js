@@ -1049,7 +1049,7 @@ Sleep
 <button>
 <span class="icon-waper">
 <ha-icon icon="mdi:lightbulb-outline"></ha-icon>
-<div class="icon-value var-led-brightness">100%</div>
+<div class="icon-value var-led-brightness" style="display:none">100%</div>
 </span>
 LED
 </button>
