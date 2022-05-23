@@ -59,7 +59,7 @@ class FanXiaomi extends HTMLElement {
 
     supportedAttributes = {
         angle: true, childLock: true, timer: true, rotationAngle: true, speedLevels: 4,
-        naturalSpeed: true, supportedAngles: [30, 60, 90, 120], sleepMode: false, led: false, buzzer: false
+        naturalSpeed: true, supportedAngles: [30, 60, 90, 120], sleepMode: false, led: false, buzzer: false, ionizer: false
     }
 
     entityFilters = {
@@ -90,6 +90,10 @@ class FanXiaomi extends HTMLElement {
         buzzerSwitch: {
             prefix: 'switch.',
             suffix: '_buzzer'
+        },
+        ionizerSwitch: {
+            prefix: 'switch.',
+            suffix: '_ionizer'
         },
         temperature: {
             prefix: 'sensor.',
@@ -293,6 +297,26 @@ class FanXiaomi extends HTMLElement {
         }
     }
 
+    setIonizer(hass, on) {
+        if (this.switchIonizerEntity) {
+            if (on) {
+                hass.callService('switch', 'turn_on', {
+                    entity_id: this.switchIonizerEntity,
+                });
+            } else {
+                hass.callService('switch', 'turn_off', {
+                    entity_id: this.switchIonizerEntity,
+                });
+            }
+        }
+    }
+
+    getIonizer(hass) {
+        if (this.switchIonizerEntity) {
+            return hass.states[this.switchIonizerEntity].state === 'on';
+        }
+    }
+
     getTemperature(hass) {
         if (this.temperatureEntity) {
             return hass.states[this.temperatureEntity].state;
@@ -386,6 +410,12 @@ class FanXiaomi extends HTMLElement {
         if (switchBuzzerEntity) {
             this.switchBuzzerEntity = switchBuzzerEntity.entity_id;
             this.supportedAttributes.buzzer = true;
+        }
+
+        const switchIonizerEntity = this.getAuxEntity(deviceEntities, this.entityFilters['ionizerSwitch']);
+        if (switchIonizerEntity) {
+            this.switchIonizerEntity = switchIonizerEntity.entity_id;
+            this.supportedAttributes.ionizer = true;
         }
     }
 
@@ -695,6 +725,17 @@ class FanXiaomi extends HTMLElement {
             }
         }
 
+        // Ionizer mode event bindings
+        ui.querySelector('.var-ionizer').onclick = () => {
+            this.log('Ionizer')
+            if (ui.querySelector('.fanbox').classList.contains('active')) {
+                let u = ui.querySelector('.var-ionizer')
+                const setIonizerOn = !u.classList.contains('active');
+                this.log(`Set ionizer mode to: ${setIonizerOn ? 'On' : 'Off'}`);
+                this.setIonizer(hass, setIonizerOn);
+            }
+        }
+
         // Oscillation toggle event bindings
         ui.querySelector('.var-oscillating').onclick = () => {
             this.log('Oscillate')
@@ -756,7 +797,8 @@ class FanXiaomi extends HTMLElement {
             temperature: this.getTemperature(hass),
             humidity: this.getHumidity(hass),
             power_supply: this.getPowerSupply(hass),
-            buzzer: this.getBuzzer(hass)
+            buzzer: this.getBuzzer(hass),
+            ionizer: this.getIonizer(hass)
         });
     }
 
@@ -973,6 +1015,14 @@ LED
 Buzzer
 </button>
 </div>
+<div class="op var-ionizer">
+<button>
+<span class="icon-waper">
+<ha-icon icon="mdi:shimmer"></ha-icon>
+</span>
+Ionizer
+</button>
+</div>
 </div>
 `
         return fanbox
@@ -982,7 +1032,7 @@ Buzzer
 
     setUI(fanboxa, { title, speed_percentage, state, child_lock, oscillating,
         delay_off_countdown, angle, speed_level, preset_mode, model, led,
-        temperature, humidity, power_supply, buzzer
+        temperature, humidity, power_supply, buzzer, ionizer
     }) {
         fanboxa.querySelector('.var-title').textContent = title
 
@@ -1073,6 +1123,20 @@ Buzzer
         activeElement = fanboxa.querySelector('.var-buzzer')
         if (this.supportedAttributes.buzzer) {
             if (buzzer) {
+                if (activeElement.classList.contains('active') === false) {
+                    activeElement.classList.add('active')
+                }
+            } else {
+                activeElement.classList.remove('active')
+            }
+        } else {
+            activeElement.style.display = 'none'
+        }
+
+        // Ionizer
+        activeElement = fanboxa.querySelector('.var-ionizer')
+        if (this.supportedAttributes.ionizer) {
+            if (ionizer) {
                 if (activeElement.classList.contains('active') === false) {
                     activeElement.classList.add('active')
                 }
