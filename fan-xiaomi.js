@@ -59,7 +59,7 @@ class FanXiaomi extends HTMLElement {
 
     supportedAttributes = {
         angle: true, childLock: true, timer: true, rotationAngle: true, speedLevels: 4,
-        naturalSpeed: true, supportedAngles: [30, 60, 90, 120], sleepMode: false, led: false, buzzer: false, ionizer: false
+        naturalSpeed: true, supportedAngles: [30, 60, 90, 120], sleepMode: false, led: false, buzzer: false, ionizer: false, ledBrightness: false
     }
 
     entityFilters = {
@@ -277,6 +277,22 @@ class FanXiaomi extends HTMLElement {
         return hass.states[this.config.entity].attributes['led_brightness'] < 2;
     }
 
+    setLedBrightness(hass, brightness) {
+        if (this.numberLedEntity) {
+            hass.callService('number', 'set_value', {
+                entity_id: this.numberLedEntity,
+                value: brightness
+            });
+        }
+    }
+
+    getLedBrightness(hass) {
+        if (this.numberLedEntity) {
+            return Math.floor(hass.states[this.numberLedEntity].state);
+        }
+        return 100;
+    }
+
     setBuzzer(hass, on) {
         if (this.switchBuzzerEntity) {
             if (on) {
@@ -392,6 +408,7 @@ class FanXiaomi extends HTMLElement {
         if (numberLedEntity) {
             this.numberLedEntity = numberLedEntity.entity_id;
             this.supportedAttributes.led = true;
+            this.supportedAttributes.ledBrightness = true;
         }
 
         const selectLedEntity = this.getAuxEntity(deviceEntities, this.entityFilters['ledSelect']);
@@ -708,9 +725,36 @@ class FanXiaomi extends HTMLElement {
             this.log('Led')
             if (ui.querySelector('.fanbox').classList.contains('active')) {
                 let u = ui.querySelector('.var-led')
-                const setLedOn = !u.classList.contains('active');
-                this.log(`Set led mode to: ${setLedOn ? 'On' : 'Off'}`);
-                this.setLed(hass, setLedOn);
+                if (!this.supportedAttributes.ledBrightness)
+                {
+                    const setLedOn = !u.classList.contains('active');
+                    this.log(`Set led mode to: ${setLedOn ? 'On' : 'Off'}`);
+                    this.setLed(hass, setLedOn);
+                }
+                else
+                {
+                    let u = ui.querySelector('.var-led');
+                    let v = ui.querySelector('.var-led-brightness');
+                    var ledBrightness = 0;
+                    if (!u.classList.contains('active'))
+                    {
+                        ledBrightness = 25;
+                    } else {
+                        var percent = parseInt(v.innerHTML.replace('%', ''));
+                        if (percent < 25)
+                            ledBrightness = 25;
+                        else if (percent < 50)
+                            ledBrightness = 50;
+                        else if (percent < 75)
+                            ledBrightness = 75;
+                        else if (percent < 100)
+                            ledBrightness = 100;
+                        else 
+                            ledBrightness = 0;
+                    }
+                    this.log(`Change LED value: ` + ledBrightness);
+                    this.setLedBrightness(hass, ledBrightness);
+                }
             }
         }
 
@@ -798,7 +842,8 @@ class FanXiaomi extends HTMLElement {
             humidity: this.getHumidity(hass),
             power_supply: this.getPowerSupply(hass),
             buzzer: this.getBuzzer(hass),
-            ionizer: this.getIonizer(hass)
+            ionizer: this.getIonizer(hass),
+            ledBrightness: this.getLedBrightness(hass)
         });
     }
 
@@ -858,6 +903,7 @@ p{margin:0;padding:0}
 .op-row .op{width:100%}
 .op-row .op button{outline:0;border:none;background:0 0;cursor:pointer}
 .op-row .op .icon-waper{display:block;margin:0 auto 5px;width:30px;height:30px}
+.icon-value{font-size:75%}
 .op-row .op.active button{color:#01be9e!important;text-shadow:0 0 10px #01be9e}
 `+ csss + `
 .fanbox-container{position:relative;}
@@ -1003,6 +1049,7 @@ Sleep
 <button>
 <span class="icon-waper">
 <ha-icon icon="mdi:lightbulb-outline"></ha-icon>
+<div class="icon-value var-led-brightness">100%</div>
 </span>
 LED
 </button>
@@ -1032,7 +1079,7 @@ Ionizer
 
     setUI(fanboxa, { title, speed_percentage, state, child_lock, oscillating,
         delay_off_countdown, angle, speed_level, preset_mode, model, led,
-        temperature, humidity, power_supply, buzzer, ionizer
+        temperature, humidity, power_supply, buzzer, ionizer, ledBrightness
     }) {
         fanboxa.querySelector('.var-title').textContent = title
 
@@ -1117,6 +1164,23 @@ Ionizer
             }
         } else {
             activeElement.style.display = 'none'
+        }
+        // LED Brighness
+        if (activeElement.style.display != 'none')
+        {
+            activeElement = fanboxa.querySelector('.var-led-brightness')
+            if (this.supportedAttributes.ledBrightness)
+            {
+                if (ledBrightness > 0)
+                {
+                    activeElement.innerHTML = ledBrightness + "%"
+                    activeElement.style.display = 'block';
+                }
+                else
+                    activeElement.style.display = 'none';
+            } else {
+                activeElement.style.display = 'none'
+            }
         }
 
         // Buzzer
